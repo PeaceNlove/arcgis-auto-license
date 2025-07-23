@@ -25,6 +25,7 @@ def main(argv):
     filename = os.path.join( sys.path[0], 'portalconfig.json')
     logfile = os.path.join( sys.path[0], 'log.txt')
     logger = logging.getLogger()
+    logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %I:%M:%S %p')
     logger.setLevel(logging.INFO)
     logger.addHandler(RotatingFileHandler(filename=logfile, mode='a', maxBytes=100000, backupCount=20, encoding=None, delay=False ))
     with open(filename) as f:
@@ -33,4 +34,4 @@ def main(argv):
         portal_config.ConfigureUser(portal, admin_user, admin_password, username)
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
