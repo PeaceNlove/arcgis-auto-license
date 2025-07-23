@@ -1,5 +1,5 @@
 from autolicense import PortalConfig
-import json, getopt, sys
+import json, getopt, os, sys, logging
 
 
 def main(argv):
@@ -21,7 +21,8 @@ def main(argv):
     except Exception as e:
         print(str(e))
         sys.exit(1)
-    with open('portalconfig.json') as f:
+    filename = os.path.join( sys.path[0], 'portalconfig.json')
+    with open(filename) as f:
         portal_config_dict = json.load(f)
         portal_config = PortalConfig(**portal_config_dict)
         portal_config.ConfigureUser(portal, admin_user, admin_password, username)
