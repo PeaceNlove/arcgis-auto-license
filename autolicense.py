@@ -1,4 +1,4 @@
-import json, os
+import json, os, logging
 from arcgis import GIS
 
 class PortalConfig:
@@ -45,15 +45,21 @@ class PortalConfig:
     
     def ConfigureUser(self, portal, admin_user, admin_password, username):
         gis = GIS(url=portal, username=admin_user, password=admin_password, verify_cert=False)
+        logging.info("Signed in to GIS {}".format(gis.url))
         user = gis.users.get(username)
-        groups = user.groups
-        group_names = [obj.title for obj in groups]
-        user_portal_config = self.AnalyzeGroups(group_names)
-        if len(user_portal_config.usertypes) >0 and user_portal_config.usertypes[0]['usertype'] != user.userLicenseTypeId:
-            self.UpdateLicenseType(gis,user,user_portal_config.usertypes[0])
-        if len(user_portal_config.userroles) > 0 and user_portal_config.userroles[0]['userrole'] != user.roleId:
-            self.UpdateRole(user,user_portal_config.userroles[0])
-        self.SyncLicenses(gis, user, user_portal_config.licenses)
+        if user is not None:
+            logging.info("Found user {}".format(username))
+            groups = user.groups
+            group_names = [obj.title for obj in groups]
+            logging.info("User {} is member of {}".format(username, ",".join(group_names)))
+            user_portal_config = self.AnalyzeGroups(group_names)
+            if len(user_portal_config.usertypes) >0 and user_portal_config.usertypes[0]['usertype'] != user.userLicenseTypeId:
+                self.UpdateLicenseType(gis,user,user_portal_config.usertypes[0])
+            if len(user_portal_config.userroles) > 0 and user_portal_config.userroles[0]['userrole'] != user.roleId:
+                self.UpdateRole(user,user_portal_config.userroles[0])
+            self.SyncLicenses(gis, user, user_portal_config.licenses)
+        else:
+            logging.warning("Could not find user {}".format(username))
         
 
     def SyncLicenses(self, gis, user, licenseconfigs):
@@ -65,44 +71,74 @@ class PortalConfig:
                     entitlement_name = row['Entitlement']
                     remaining = row['Remaining']
                     users = row['Users']
+                    logging.info("{} {}".format(entitlement_name, remaining))
                     licenseconfig = next((lt for lt in licenseconfigs if lt['userlicense'] ==entitlement_name), None)
                     if licenseconfig is not None:
                         isLicensed = False
                         for entitled_user in users:
                             if entitled_user['user'] == user.username:
                                 isLicensed =  True
+                                logging.info("{} already licensed for {}".format(user.username, entitlement_name))
                         if not isLicensed:
                             if remaining ==0:
                                 self.UnLicenseOldUser(gis=gis, license=license, groupname=licenseconfig['groupname'], entitlement=entitlement_name)
-                            license.assign(user.username, entitlement_name, False, False)
+                            try:
+                                license.assign(user.username, entitlement_name, False, False)
+                                logging.info("{} assigned {}".format(user.username, entitlement_name))
+                            except Exception as e:
+                                logging.error("Error assigning {} to {}".format(entitlement_name, user.username))
+                                logging.error(e) 
                     else:
                         for entitled_user in users:
                             if entitled_user['user'] == user.username:
                                 result = license.revoke(user.username, entitlement_name)
+                                logging.info("{} revoked {} : {}".format(user.username, entitlement_name, result))
 
     def UpdateRole(self,user,user_portal_config):
-        result = user.update_role(user_portal_config['userrole'])
-        #do some logging of the result here
+        try:
+            result = user.update_role(user_portal_config['userrole'])
+            logging.info("{} assigned role {} : {}".format(user.username, user_portal_config['userrole'], result))
+        except Exception as e:
+            logging.error("Error updating role {} for user {}".format(user_portal_config['userrole'], user.username))
+            logging.error(e) 
 
     def UpdateLicenseType(self, gis, user, user_portal_config):
         user_type_object = next((lt for lt in gis.users.license_types if lt['id'] ==user_portal_config['usertype']), None)
         if user_type_object is None:
-            return #exceptionhandling / logging here
+            logging.error("Could not find the license {} in the portal".format(user_portal_config['usertype']))
+            return 
         counts = gis.users.counts('user_type', as_df=False)
         hasRoom = False
         for t in counts:
             if t['key'] == user_portal_config['usertype']:
                 hasRoom = user_type_object['maxUsers'] - t['count'] >0
+                logging.info("Total licenses: {}".format(user_type_object['maxUsers']))
+                logging.info("Assigned licenses: {}".format(t['count']))
         if not hasRoom:
-            result = self.UnAssignOldUser(gis,user_portal_config.groupname, user_portal_config['usertype'])
-        result = user.update_license_type(user_portal_config['usertype'])
-        if not result and user_portal_config.upgrade_usertype is not None and user_portal_config.upgrade_usertype != '':
+            self.UnAssignOldUser(gis,user_portal_config['groupname'], user_portal_config['downgrade_usertype'])
+        result = False
+        try:
+            result = user.update_license_type(user_portal_config['usertype'])
+            if result ==  False:
+                raise Exception("Result on update_license_type is False")
+            else:
+                logging.info("{} assigned license {} : {}".format(user.username, user_portal_config['usertype'], result))
+        except Exception as e:
+            logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
+            logging.error(e) 
+        if not result and user_portal_config['upgrade_usertype'] is not None and user_portal_config['upgrade_usertype'] != '':
             for t in counts:
                 if t['key'] == user_portal_config.upgrade_usertype:
                     hasRoom = user_type_object['maxUsers'] - t['count'] >0
             if not hasRoom:
-                result = self.UnAssignOldUser(gis,user_portal_config.groupname, user_portal_config.upgrade_usertype)
-            result = user.update_license_type(user_portal_config.upgrade_usertype)
+                result = self.UnAssignOldUser(gis,user_portal_config['groupname'], user_portal_config['downgrade_usertype'])
+            try:
+                result = user.update_license_type(user_portal_config['upgrade_usertype'])
+                if result ==  False:
+                    raise Exception("Result on update_license_type is False")
+            except Exception as e:
+                logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
+                logging.error(e)
         return result
     
     def GetLastLogin(self,gis,groupname):
@@ -121,9 +157,13 @@ class PortalConfig:
     def UnAssignOldUser(self, gis, groupname, usertype ):
         members = self.GetLastLogin(gis=gis, groupname=groupname)
         for member in members:
-            result = member.update_license_type(usertype)
-            if result:
-                return True
+            try:
+                result = member.update_license_type(usertype)
+                if result:                    
+                    logging.info("{} downgraded to license {} : {}".format(member.username, usertype, result))
+                    return True
+            except:
+                pass
         return False
     
     def UnLicenseOldUser(self,gis,license,groupname, entitlement ):
@@ -132,6 +172,7 @@ class PortalConfig:
             if entitlement in  license.check(member):
                 result = license.revoke(member, entitlement)
                 if result:
+                    logging.info("{} revoked {} : {}".format(member.username, entitlement, result))
                     return True
         return False
      
