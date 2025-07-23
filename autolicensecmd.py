@@ -1,4 +1,5 @@
 from autolicense import PortalConfig
+from logging.handlers import RotatingFileHandler
 import json, getopt, os, sys, logging
 
 
@@ -22,6 +23,10 @@ def main(argv):
         print(str(e))
         sys.exit(1)
     filename = os.path.join( sys.path[0], 'portalconfig.json')
+    logfile = os.path.join( sys.path[0], 'log.txt')
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(RotatingFileHandler(filename=logfile, mode='a', maxBytes=100000, backupCount=20, encoding=None, delay=False ))
     with open(filename) as f:
         portal_config_dict = json.load(f)
         portal_config = PortalConfig(**portal_config_dict)
