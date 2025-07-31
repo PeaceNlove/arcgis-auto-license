@@ -24,10 +24,14 @@ def main(argv):
         sys.exit(1)
     filename = os.path.join( sys.path[0], 'portalconfig.json')
     logfile = os.path.join( sys.path[0], 'log.txt')
-    logger = logging.getLogger()
-    logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %I:%M:%S %p')
-    logger.setLevel(logging.INFO)
-    logger.addHandler(RotatingFileHandler(filename=logfile, mode='a', maxBytes=100000, backupCount=20, encoding=None, delay=False ))
+    logging.basicConfig(
+        format='%(asctime)s %(message)s', 
+        datefmt='%Y/%m/%d %I:%M:%S %p',
+        level=logging.INFO,
+        handlers=[
+            RotatingFileHandler(filename=logfile, mode='a', maxBytes=100000, backupCount=20, encoding=None, delay=False )
+        ]
+        )
     with open(filename) as f:
         portal_config_dict = json.load(f)
         portal_config = PortalConfig(**portal_config_dict)
