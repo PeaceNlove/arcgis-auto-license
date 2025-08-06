@@ -1,0 +1,34 @@
+{
+    "defaultType": {"usertype":"viewerUT"},
+    "defaultRole": {"userrole":"viewer"},
+    "usertypes":[
+        {
+            "groupname":"ADMIN",
+            "usertype":"creatorUT",
+            "downgrade_usertype":"",
+            "upgrade_usertype":"",
+            "rank": 100
+        }
+    ],
+    "userroles":[
+        {
+            "groupname":"ADMIN",
+            "userrole":"org_admin",
+            "rank": 100
+        }
+    ],
+    "licenses":[
+        {
+            "licensegroup":"arcgis_pro",
+            "groupname":"ADMIN",
+            "userlicense":"desktopStdN",
+            "rank": 10
+        },
+        {
+            "licensegroup":"advediting",
+            "groupname":"ADMIN",
+            "userlicense":"advediting",
+            "rank": 10
+        }
+    ]
+}
