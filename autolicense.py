@@ -1,6 +1,7 @@
 import json, os, logging
 from arcgis import GIS
 
+
 class PortalConfig:
     def __init__(self, usertypes, userroles, licenses, defaultType="", defaultRole=""):
         self.usertypes = usertypes
@@ -29,8 +30,8 @@ class PortalConfig:
         usertypes = self.GetUserType(groups)
         userroles = self.GetUserRole(groups)
         licenses = self.GetLicenses(groups)
-        return PortalConfig(usertypes,userroles,licenses)
-    
+        return PortalConfig(usertypes, userroles, licenses)
+
     def GetUserType(self, groups):
         """
         Checks whether the user is a member of the set of predefined user type groups from portalconfig.json.
@@ -43,7 +44,7 @@ class PortalConfig:
             return [maxType]
         else:
             return [self.defaultType]
-    
+
     def GetUserRole(self, groups):
         """
         Checks whether the user is a member of the set of predefined user role groups from portalconfig.json.
@@ -56,7 +57,7 @@ class PortalConfig:
             return [maxType]
         else:
             return [self.defaultRole]
-    
+
     def GetLicenses(self, groups):
         """
         Checks whether the user is a member of the set of predefined license groups from portalconfig.json, grouped by the licensegroup property.
@@ -67,9 +68,9 @@ class PortalConfig:
         licenses_grouped = {}
         for item in self.licenses:
             licenses_grouped.setdefault(item['licensegroup'], []).append(item)
-        for key in licenses_grouped:            
+        for key in licenses_grouped:
             validLicenses = [obj for obj in licenses_grouped[key] if obj['groupname'] in groups]
-            if len(validLicenses) >0:
+            if len(validLicenses) > 0:
                 maxLicense = max(validLicenses, key=lambda x: x['rank'])
                 licenses_result.append(maxLicense)
         return licenses_result
@@ -104,7 +105,7 @@ class PortalConfig:
                 logging.error(e)
         else:
             logging.warning("Could not find user {}".format(username))
-        
+
 
     def SyncLicenses(self, gis, user, licenseconfigs):
         """
@@ -127,14 +128,14 @@ class PortalConfig:
                                 isLicensed = True
                                 logging.info("{} already licensed for {}".format(user.username, entitlement_name))
                         if not isLicensed:
-                            if remaining ==0:
+                            if remaining == 0:
                                 self.UnLicenseOldUser(gis=gis, license=license, groupname=licenseconfig['groupname'], entitlement=entitlement_name)
                             try:
                                 license.assign(user.username, entitlement_name, False, False)
                                 logging.info("{} assigned {}".format(user.username, entitlement_name))
                             except Exception as e:
                                 logging.error("Error assigning {} to {}".format(entitlement_name, user.username))
-                                logging.error(e) 
+                                logging.error(e)
                     else:
                         for entitled_user in users:
                             if entitled_user['user'] == user.username:
@@ -159,7 +160,7 @@ class PortalConfig:
         user_type_object = next((lt for lt in gis.users.license_types if lt['id'] == user_portal_config['usertype']), None)
         if user_type_object is None:
             logging.error("Could not find the license {} in the portal".format(user_portal_config['usertype']))
-            return 
+            return
         counts = gis.users.counts('user_type', as_df=False)
         licenseAvailable = False
         for t in counts:
@@ -238,7 +239,7 @@ class PortalConfig:
                     logging.info("{} revoked {} : {}".format(member.username, entitlement, result))
                     return True
         return False
-     
+
 
 def main():
     portal = os.getenv('PORTAL')
@@ -249,6 +250,7 @@ def main():
         portal_config_dict = json.load(f)
         portal_config = PortalConfig(**portal_config_dict)
         portal_config.ConfigureUser(portal, admin_user, admin_password, username)
+
 
 if __name__ == '__main__':
     main()
