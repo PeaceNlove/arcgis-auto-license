@@ -141,13 +141,27 @@ class PortalConfig:
             logging.error("Could not find the license {} in the portal".format(user_portal_config['usertype']))
             return 
         counts = gis.users.counts('user_type', as_df=False)
-        hasRoom = False
+        licenseAvailable = False
         for t in counts:
             if t['key'] == user_portal_config['usertype']:
-                hasRoom = user_type_object['maxUsers'] - t['count'] > 0
+                licenseAvailable = user_type_object['maxUsers'] - t['count'] > 0
                 logging.info("Total licenses: {}".format(user_type_object['maxUsers']))
                 logging.info("Assigned licenses: {}".format(t['count']))
-        if not hasRoom:
+        if not licenseAvailable and user_portal_config['upgrade_usertype'] is not None and user_portal_config['upgrade_usertype'] != '':
+            for t in counts:
+                if t['key'] == user_portal_config['upgrade_usertype']:
+                    upgradeLicenseAvailable = user_type_object['maxUsers'] - t['count'] > 0
+            if upgradeLicenseAvailable:
+                try:
+                    result = user.update_license_type(user_portal_config['upgrade_usertype'])
+                    if result == False:
+                        raise Exception("Result on update_license_type is False")
+                    else:
+                        return result
+                except Exception as e:
+                    logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
+                    logging.error(e)
+        if not licenseAvailable:
             self.UnAssignOldUser(gis,user_portal_config['groupname'], user_portal_config['downgrade_usertype'])
         result = False
         try:
@@ -158,20 +172,7 @@ class PortalConfig:
                 logging.info("{} assigned license {} : {}".format(user.username, user_portal_config['usertype'], result))
         except Exception as e:
             logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
-            logging.error(e) 
-        if not result and user_portal_config['upgrade_usertype'] is not None and user_portal_config['upgrade_usertype'] != '':
-            for t in counts:
-                if t['key'] == user_portal_config.upgrade_usertype:
-                    hasRoom = user_type_object['maxUsers'] - t['count'] > 0
-            if not hasRoom:
-                result = self.UnAssignOldUser(gis,user_portal_config['groupname'], user_portal_config['downgrade_usertype'])
-            try:
-                result = user.update_license_type(user_portal_config['upgrade_usertype'])
-                if result == False:
-                    raise Exception("Result on update_license_type is False")
-            except Exception as e:
-                logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
-                logging.error(e)
+            logging.error(e)
         return result
     
     def GetUserSortedByLastLogin(self,gis,groupname):
