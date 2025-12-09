@@ -195,13 +195,15 @@ class PortalConfig:
             logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
             logging.error(e)
         return result
-    
-    def GetUserSortedByLastLogin(self,gis,groupname):
+
+    def GetUserSortedByLastLogin(self, gis, groupname):
         """
         Returns an array of gis.user objects which are member of group sorted by lastLogin
         """
         groups = gis.groups.search()  # change to search first
         members_list = []
+        if len(groups) == 0:
+            logging.info("No groups found")
         for group in groups:
             if group.title == groupname:
                 members = group.get_members()
