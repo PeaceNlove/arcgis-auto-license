@@ -200,7 +200,7 @@ class PortalConfig:
         """
         Returns an array of gis.user objects which are member of group sorted by lastLogin
         """
-        groups = gis.groups.search(groupname) #change to search first
+        groups = gis.groups.search()  # change to search first
         members_list = []
         for group in groups:
             if group.title == groupname:
