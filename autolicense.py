@@ -8,7 +8,18 @@ class PortalConfig:
         self.licenses = licenses
         self.defaultType = defaultType
         self.defaultRole = defaultRole
-   
+
+    def GetRoleID(self, gis, rolename):
+        """
+        Returns the roleid for a rolename or roleid
+        """
+        roles = gis.users.roles.all()
+        for role in roles:
+            if role.name == rolename:
+                return role.role_id
+            elif role.role_id == rolename:
+                return role.role_id
+
     def AnalyzeGroups(self, groups):
         """
         Creates a PortalConfig for a specific user based on the groups the user is currently a member of.
@@ -72,16 +83,25 @@ class PortalConfig:
         logging.info("Signed in to GIS {}".format(gis.url))
         user = gis.users.get(username)
         if user is not None:
-            logging.info("Found user {}".format(username))
-            groups = user.groups
-            group_names = [obj.title for obj in groups]
-            logging.info("User {} is member of {}".format(username, ",".join(group_names)))
-            user_portal_config = self.AnalyzeGroups(group_names)
-            if len(user_portal_config.usertypes) >0 and user_portal_config.usertypes[0]['usertype'] != user.userLicenseTypeId:
-                self.UpdateLicenseType(gis,user,user_portal_config.usertypes[0])
-            if len(user_portal_config.userroles) > 0 and user_portal_config.userroles[0]['userrole'] != user.roleId:
-                self.UpdateRole(user,user_portal_config.userroles[0])
-            self.SyncLicenses(gis, user, user_portal_config.licenses)
+            try:
+                logging.info("Found user {}".format(username))
+                groups = user.groups
+                group_names = [obj.title for obj in groups]
+                logging.info("User {} is member of {}".format(username, ",".join(group_names)))
+                user_portal_config = self.AnalyzeGroups(group_names)
+                if len(user_portal_config.usertypes) > 0 and user_portal_config.usertypes[0]['usertype'] != user.userLicenseTypeId:
+                    logging.info("Current licensetype {}, configured licensetype {}".format(user.userLicenseTypeId, user_portal_config.usertypes[0]['usertype']))
+                    self.UpdateLicenseType(gis, user, user_portal_config.usertypes[0])
+                logging.info("Licensetype synced")
+                roleid = self.GetRoleID(gis, user_portal_config.userroles[0]['userrole'])
+                if len(user_portal_config.userroles) > 0 and roleid != user.roleId:
+                    logging.info("Current Roleid {}, configured roleid {} {}".format(user.roleId, roleid, user_portal_config.userroles[0]['userrole'] ))
+                    self.UpdateRole(user, roleid, user_portal_config.userroles[0]['userrole'])
+                logging.info("Role synced")
+                self.SyncLicenses(gis, user, user_portal_config.licenses)
+                logging.info("Licenses synced")
+            except Exception as e:
+                logging.error(e)
         else:
             logging.warning("Could not find user {}".format(username))
         
@@ -121,16 +141,16 @@ class PortalConfig:
                                 result = license.revoke(user.username, entitlement_name)
                                 logging.info("{} revoked {} : {}".format(user.username, entitlement_name, result))
 
-    def UpdateRole(self,user,user_portal_config):
+    def UpdateRole(self, user, role_id, role_name):
         """
         Updates the user's user role based on the expected user role from user_portal_config.userroles.
         """
         try:
-            result = user.update_role(user_portal_config['userrole'])
-            logging.info("{} assigned role {} : {}".format(user.username, user_portal_config['userrole'], result))
+            result = user.update_role(role_id)
+            logging.info("{} assigned role {} {}: {}".format(user.username, role_name, role_id, result))
         except Exception as e:
-            logging.error("Error updating role {} for user {}".format(user_portal_config['userrole'], user.username))
-            logging.error(e) 
+            logging.error("Error updating role {} {} for user {}".format(role_name, role_id, user.username))
+            logging.error(e)
 
     def UpdateLicenseType(self, gis, user, user_portal_config):
         """
