@@ -171,18 +171,24 @@ class PortalConfig:
         if not licenseAvailable and user_portal_config['upgrade_usertype'] is not None and user_portal_config['upgrade_usertype'] != '':
             for t in counts:
                 if t['key'] == user_portal_config['upgrade_usertype']:
-                    upgradeLicenseAvailable = user_type_object['maxUsers'] - t['count'] > 0
+                    upgrade_user_type_object = next((lt for lt in gis.users.license_types if lt['id'] == user_portal_config['upgrade_usertype']), None)
+                    if upgrade_user_type_object  is not None:
+                        upgradeLicenseAvailable = upgrade_user_type_object['maxUsers'] - t['count'] > 0
+                        logging.info("Total licenses upgrade_usertype: {}".format(upgrade_user_type_object['maxUsers']))
+                        logging.info("Assigned licenses upgrade_usertype: {}".format(t['count']))
             if upgradeLicenseAvailable:
                 try:
                     result = user.update_license_type(user_portal_config['upgrade_usertype'])
                     if result == False:
-                        raise Exception("Result on update_license_type is False")
+                        logging.warning("Result on update_license_type is False")
+                        #raise Exception("Result on update_license_type is False")
                     else:
                         return result
                 except Exception as e:
                     logging.error("Error updating license type {} for user {}".format(user_portal_config['usertype'], user.username))
                     logging.error(e)
         if not licenseAvailable:
+            logging.info("unassignolduser")
             self.UnAssignOldUser(gis,user_portal_config['groupname'], user_portal_config['downgrade_usertype'])
         result = False
         try:
@@ -214,22 +220,27 @@ class PortalConfig:
         full_members.sort(key=lambda x: x.lastLogin, reverse=False)
         return full_members
 
-    def UnAssignOldUser(self, gis, groupname, usertype):
+    def UnAssignOldUser(self, gis, groupname, downgrade_usertype, needed_usertype):
         """
         Identifies the user in the group with the oldest login timestamp and changes the usertype to the specified (downgrade) usertype
         """
         members = self.GetUserSortedByLastLogin(gis=gis, groupname=groupname)
+        logging.info("{} has {} members".format(groupname, str(len(members))))
         for member in members:
             try:
-                result = member.update_license_type(usertype)
-                if result:                    
-                    logging.info("{} downgraded to license {} : {}".format(member.username, usertype, result))
-                    return True
+                if member["userLicenseTypeId"] != downgrade_usertype and member["userLicenseTypeId"] == needed_usertype:  # if member["userLicenseTypeId"] == needed_usertype: is denk ook al genoeg.
+                    logging.info("try to unassign " + member.username)
+                    result = member.update_license_type(downgrade_usertype)
+                    if result == True:
+                        logging.info("{} license {} downgraded to license {} : {}".format(member.username, member["userLicenseTypeId"], downgrade_usertype, result))
+                        return True
+                    else:
+                        logging.warning("error unassigning {}".format(result))
             except:
-                pass
+                logging.warning("error unassigning {}".format(member))
         return False
-    
-    def UnLicenseOldUser(self,gis,license,groupname, entitlement):
+
+    def UnLicenseOldUser(self, gis, license, groupname, entitlement):
         """
         Identifies the user in the group with the oldest login timestamp and revokes their license.
         """
