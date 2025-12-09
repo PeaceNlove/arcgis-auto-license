@@ -8,6 +8,13 @@
             "downgrade_usertype":"",
             "upgrade_usertype":"",
             "rank": 100
+        },
+        {
+            "groupname":"EDIT",
+            "usertype":"creatorUT",
+            "downgrade_usertype":"",
+            "upgrade_usertype":"",
+            "rank": 50
         }
     ],
     "userroles":[
@@ -15,10 +22,20 @@
             "groupname":"ADMIN",
             "userrole":"org_admin",
             "rank": 100
+        },
+        {
+            "groupname":"EDIT",
+            "userrole":"My custom role",
+            "rank": 50
         }
     ],
     "licenses":[
         {
+            "licensegroup":"arcgis_pro",
+            "groupname":"EDIT",
+            "userlicense":"desktopBasicN",
+            "rank": 10
+        },{
             "licensegroup":"arcgis_pro",
             "groupname":"ADMIN",
             "userlicense":"desktopStdN",
